@@ -1,0 +1,51 @@
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger'
+import { IsEmail, IsOptional, IsString, Matches, MinLength } from 'class-validator'
+import { PaginateDto } from '@app/shared/dto'
+
+export class CreateUserDto {
+  @ApiProperty()
+  @IsEmail()
+  email: string
+
+  @ApiProperty()
+  @IsString()
+  @Matches(/^[a-zA-Z0-9_]{3,30}$/, { message: 'username must be 3-30 chars, alphanumeric or _' })
+  username: string
+
+  @ApiProperty({ minLength: 8 })
+  @IsString()
+  @MinLength(8)
+  password: string
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  bio?: string
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  avatarUrl?: string
+}
+
+class UpdatableUserFields {
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  username?: string
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  bio?: string
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  avatarUrl?: string
+}
+
+/** All fields optional; password excluded (handled by a dedicated endpoint). */
+export class UpdateUserDto extends PartialType(UpdatableUserFields) {}
+
+export class QueryUsersDto extends PaginateDto {}
