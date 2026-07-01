@@ -14,6 +14,7 @@ import { RawBodyMiddleware } from '@app/shared/middleware'
 import { HttpExceptionFilter } from '@app/shared/filters'
 import { TransformInterceptor } from '@app/shared/interceptors'
 import { AppModule } from './app.module'
+import { RedisIoAdapter } from './chat/redis-io.adapter'
 
 const logger = new Logger('Bootstrap')
 
@@ -52,6 +53,15 @@ async function bootstrap() {
   app.enableCors(config.get<ICorsConfig>('cors'))
   app.setGlobalPrefix(config.get<string>('app.prefix'))
   setupSwagger(app)
+
+  // Socket.io: use the Redis adapter for horizontal scale when REDIS_URL is set,
+  // otherwise fall back to the default single-node in-memory adapter (dev).
+  if (process.env.REDIS_URL) {
+    const redisIoAdapter = new RedisIoAdapter(app)
+    await redisIoAdapter.connectToRedis(process.env.REDIS_URL)
+    app.useWebSocketAdapter(redisIoAdapter)
+    logger.log('Socket.io Redis adapter enabled')
+  }
 
   await runPendingMigrations(app)
 
