@@ -33,6 +33,14 @@ export class User extends MyEntity {
   @Column({ type: 'enum', enum: Status, default: Status.ACTIVE })
   status: Status
 
+  /** Web2-simulated ETH balance (numeric → serialized as string). Backed on-chain later. */
+  @Column({ type: 'numeric', precision: 30, scale: 8, default: 0 })
+  ethBalance: string
+
+  /** Web2-simulated FANS balance (numeric → serialized as string). Backed on-chain later. */
+  @Column({ type: 'numeric', precision: 30, scale: 8, default: 0 })
+  fansBalance: string
+
   toResponseObject() {
     const { passwordHash, ...safe } = this as User & { passwordHash?: string }
     return safe
