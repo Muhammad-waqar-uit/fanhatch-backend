@@ -17,3 +17,6 @@ logs/
 .idea/
 .vscode/
 *.tsbuildinfo
+
+# backups (may contain secrets)
+*.bak
