@@ -24,6 +24,9 @@ import { Follow } from '../social/entities/follow.entity'
 import { ChatRoom, ChatRoomType } from '../chat/entities/chat-room.entity'
 import { RoomMember, RoomMemberRole } from '../chat/entities/room-member.entity'
 import { ChatMessage, ChatMessageType } from '../chat/entities/chat-message.entity'
+import { LpPool } from '../lp/entities/lp-pool.entity'
+import { Post, PostStatus } from '../posts/entities/post.entity'
+import { Trade, TradeSide } from '../posts/entities/trade.entity'
 import { estimatePrice } from '../clubs/curve.util'
 
 const dataSource = new DataSource({
@@ -33,7 +36,7 @@ const dataSource = new DataSource({
   username: process.env.TYPEORM_USERNAME || 'postgres',
   password: process.env.TYPEORM_PASSWORD || 'postgres',
   database: process.env.TYPEORM_DATABASE || 'fanstech',
-  entities: [User, Club, Holding, Follow, ChatRoom, RoomMember, ChatMessage],
+  entities: [User, Club, Holding, Follow, ChatRoom, RoomMember, ChatMessage, LpPool, Post, Trade],
   synchronize: false,
   logging: false,
   ssl: process.env.TYPEORM_SSL === 'true' ? { rejectUnauthorized: false } : false,
@@ -59,11 +62,18 @@ async function main(): Promise<void> {
   }
 
   const passwordHash = await bcrypt.hash('password123', 10)
+  // Web2-simulated balances so Wallet/LP have something to trade.
   const alice = await users.save(
-    users.create({ email: 'alice@fans.tech', username: 'alice', passwordHash, bio: 'Founder #1' }),
+    users.create({
+      email: 'alice@fans.tech', username: 'alice', passwordHash, bio: 'Founder #1',
+      ethBalance: money(2), fansBalance: money(5000),
+    }),
   )
   const bob = await users.save(
-    users.create({ email: 'bob@fans.tech', username: 'bob', passwordHash, bio: 'Founder #2' }),
+    users.create({
+      email: 'bob@fans.tech', username: 'bob', passwordHash, bio: 'Founder #2',
+      ethBalance: money(1.5), fansBalance: money(3000),
+    }),
   )
   console.log('[seed] users:', alice.username, bob.username)
 
@@ -131,6 +141,36 @@ async function main(): Promise<void> {
     messages.create({ roomId: dm.id, senderId: bob.id, body: 'Hi Alice, love the club.' }),
   ])
   console.log('[seed] dm + messages created')
+
+  // --- LP pool (singleton) — reserves so swap/quote/net-worth are meaningful ---
+  const pools = dataSource.getRepository(LpPool)
+  if (!(await pools.findOne({ where: {} }))) {
+    // 10 ETH : 1,000,000 FANS  => fansPerEth = 100k, $FANS ≈ $0.03 (ETH=$3000)
+    await pools.save(
+      pools.create({ reserveEth: money(10), reserveFans: money(1_000_000), totalShares: money(100_000) }),
+    )
+    console.log('[seed] lp pool created')
+  }
+
+  // --- Sample posts (Home feed) --------------------------------------------
+  const posts = dataSource.getRepository(Post)
+  await posts.save([
+    posts.create({ authorId: alice.id, body: 'gm — Alice Club keys are live. First key was free 👑', status: PostStatus.PUBLISHED }),
+    posts.create({ authorId: bob.id, body: 'Just aped into a few clubs. The bonding curve UX is smooth.', status: PostStatus.PUBLISHED }),
+    posts.create({ authorId: alice.id, body: 'Scheduling a big drop for the weekend.', status: PostStatus.PUBLISHED }),
+  ])
+
+  // --- Sample trades (Transactions filter) ----------------------------------
+  const trades = dataSource.getRepository(Trade)
+  const aliceClub = await clubs.findOne({ where: { ticker: '$ALICE' } })
+  const bobClub = await clubs.findOne({ where: { ticker: '$BOB' } })
+  if (aliceClub && bobClub) {
+    await trades.save([
+      trades.create({ actorId: bob.id, clubId: aliceClub.id, ticker: aliceClub.ticker, side: TradeSide.BUY, amount: 2, pricePerKey: aliceClub.keyPrice }),
+      trades.create({ actorId: alice.id, clubId: bobClub.id, ticker: bobClub.ticker, side: TradeSide.BUY, amount: 1, pricePerKey: bobClub.keyPrice }),
+    ])
+  }
+  console.log('[seed] posts + trades created')
 
   await dataSource.destroy()
   console.log('[seed] done')

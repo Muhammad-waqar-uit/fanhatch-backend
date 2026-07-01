@@ -13,6 +13,9 @@ import { AuthModule } from './auth/auth.module'
 import { ChatModule } from './chat/chat.module'
 import { ClubsModule } from './clubs/clubs.module'
 import { SocialModule } from './social/social.module'
+import { WalletModule } from './wallet/wallet.module'
+import { LpModule } from './lp/lp.module'
+import { PostsModule } from './posts/posts.module'
 
 @Module({
   imports: [
@@ -52,6 +55,9 @@ import { SocialModule } from './social/social.module'
     ChatModule,
     ClubsModule,
     SocialModule,
+    WalletModule,
+    LpModule,
+    PostsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
