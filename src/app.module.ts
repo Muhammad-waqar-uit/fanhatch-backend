@@ -10,6 +10,9 @@ import { rootConfig, dbConfig, jwtConfig, corsConfig, swaggerConfig } from '@app
 import { HealthModule } from './health/health.module'
 import { UsersModule } from './users/users.module'
 import { AuthModule } from './auth/auth.module'
+import { ChatModule } from './chat/chat.module'
+import { ClubsModule } from './clubs/clubs.module'
+import { SocialModule } from './social/social.module'
 
 @Module({
   imports: [
@@ -29,6 +32,9 @@ import { AuthModule } from './auth/auth.module'
         database: config.get<string>('db.database'),
         autoLoadEntities: true,
         synchronize: config.get<boolean>('db.synchronize'),
+        // Migrations glob so main.ts can auto-apply them on boot (TYPEORM_MIGRATIONS_RUN=true).
+        migrations: [__dirname + '/migrations/*{.js,.ts}'],
+        migrationsTableName: 'migrations',
         logging: config.get<boolean>('db.logging'),
         ssl: config.get<boolean>('db.ssl') ? { rejectUnauthorized: false } : false,
       }),
@@ -43,6 +49,9 @@ import { AuthModule } from './auth/auth.module'
     HealthModule,
     UsersModule,
     AuthModule,
+    ChatModule,
+    ClubsModule,
+    SocialModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

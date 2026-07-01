@@ -7,7 +7,10 @@ export default () => ({
     password: process.env.TYPEORM_PASSWORD || 'postgres',
     database: process.env.TYPEORM_DATABASE || 'fanstech',
     // Entities are auto-loaded by @nestjs/typeorm (autoLoadEntities); migrations run via the CLI.
-    synchronize: false,
+    // DEV ONLY: set TYPEORM_SYNC=true to auto-create the schema from entities (no migrations needed
+    // for a quick local test). Keep false in prod and use migrations. ponytail: a proper `users`
+    // baseline migration is still TODO — until then, dev relies on sync.
+    synchronize: process.env.TYPEORM_SYNC === 'true',
     logging: process.env.TYPEORM_LOGGING === 'true',
     ssl: process.env.TYPEORM_SSL === 'true',
   },
