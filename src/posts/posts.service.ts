@@ -160,6 +160,20 @@ export class PostsService {
   }
 
   /**
+   * Idempotent single-post publish, used by the BullMQ post-publish processor.
+   * The conditional UPDATE (id=? AND status='scheduled') means a retried job or
+   * a concurrent cron sweep never double-publishes. Returns true iff this call
+   * flipped the row to published.
+   */
+  async publishScheduledPost(postId: string): Promise<boolean> {
+    const result = await this.posts.update(
+      { id: postId, status: PostStatus.SCHEDULED },
+      { status: PostStatus.PUBLISHED, publishedAt: () => 'now()' },
+    )
+    return (result.affected ?? 0) > 0
+  }
+
+  /**
    * Feed: `posts` → published posts only; `transactions` → trades only;
    * `all` → both. `viewerId` (optional) drives the `liked` flag.
    */
