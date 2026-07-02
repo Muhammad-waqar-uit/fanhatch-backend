@@ -84,6 +84,8 @@ export class ChatMessageDto {
   @ApiProperty() roomId: string
   @ApiProperty() senderId: string
   @ApiProperty() senderName: string
+  @ApiProperty({ description: "Sender's handle (username); links to /u/{handle}." })
+  senderHandle: string
   @ApiPropertyOptional() senderAvatarUrl?: string
   @ApiProperty({ enum: ['text', 'image', 'gif'] }) type: MessageType
   @ApiProperty() body: string

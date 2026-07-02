@@ -64,6 +64,7 @@ export class MessageService {
       roomId: m.roomId,
       senderId: m.senderId,
       senderName: sender?.username ?? 'Unknown',
+      senderHandle: sender?.username ?? '',
       senderAvatarUrl: sender?.avatarUrl,
       type: m.type,
       body: m.body,
