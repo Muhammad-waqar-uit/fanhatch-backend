@@ -64,4 +64,11 @@ export class Club extends MyEntity {
 
   @Column({ type: 'int', default: 1 })
   memberCount: number
+
+  /**
+   * Current elected president (web2 GovernanceModule sim). Null until a
+   * candidate's vote weight passes a simple majority of `supply`.
+   */
+  @Column({ type: 'uuid', nullable: true })
+  presidentId?: string
 }
