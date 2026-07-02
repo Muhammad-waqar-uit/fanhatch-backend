@@ -7,6 +7,9 @@ import { ScheduleModule } from '@nestjs/schedule'
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { rootConfig, dbConfig, jwtConfig, corsConfig, swaggerConfig } from '@app/config'
+import { bullmqConfig } from '@app/config/bullmq.config'
+import { isRedisConfigured } from '@app/shared/redis/redis.util'
+import { TaskSchedulerModule } from './task-scheduler/task-scheduler.module'
 import { HealthModule } from './health/health.module'
 import { UsersModule } from './users/users.module'
 import { AuthModule } from './auth/auth.module'
@@ -47,6 +50,10 @@ import { PostsModule } from './posts/posts.module'
     EventEmitterModule.forRoot(),
     ScheduleModule.forRoot(),
     CacheModule.register({ isGlobal: true }),
+
+    // Durable BullMQ jobs — wired only when REDIS_URL is set. Without Redis the
+    // app boots on the Redis-free CronScheduler fallback (see posts.module.ts).
+    ...(isRedisConfigured() ? [bullmqConfig(), TaskSchedulerModule] : []),
 
     // Feature modules — add new ones here.
     HealthModule,
