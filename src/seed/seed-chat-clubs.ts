@@ -66,12 +66,14 @@ async function main(): Promise<void> {
   const alice = await users.save(
     users.create({
       email: 'alice@fans.tech', username: 'alice', passwordHash, bio: 'Founder #1',
+      avatarUrl: 'https://i.pravatar.cc/150?u=alice',
       ethBalance: money(2), fansBalance: money(5000),
     }),
   )
   const bob = await users.save(
     users.create({
       email: 'bob@fans.tech', username: 'bob', passwordHash, bio: 'Founder #2',
+      avatarUrl: 'https://i.pravatar.cc/150?u=bob',
       ethBalance: money(1.5), fansBalance: money(3000),
     }),
   )
