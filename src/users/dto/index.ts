@@ -54,4 +54,18 @@ export class SetWalletDto {
   @ApiProperty({ description: 'Smart-account / wallet address (EIP-55 or lowercase)' })
   @IsEthereumAddress()
   walletAddress: string
+
+  @ApiPropertyOptional({
+    description: 'Ownership-proof message signed by the underlying Web3Auth EOA',
+  })
+  @IsString()
+  @IsOptional()
+  message?: string
+
+  @ApiPropertyOptional({
+    description: 'EOA signature over `message` (proves control of the Web3Auth key)',
+  })
+  @IsString()
+  @IsOptional()
+  signature?: string
 }

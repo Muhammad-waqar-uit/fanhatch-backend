@@ -1,10 +1,19 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common'
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import * as bcrypt from 'bcryptjs'
 import { Repository } from 'typeorm'
+import { isAddress, recoverMessageAddress, zeroAddress } from 'viem'
 import { MyService } from '@app/shared/base'
-import { CreateUserDto } from './dto'
+import { CreateUserDto, SetWalletDto } from './dto'
 import { User } from './user.entity'
+
+/** Zero address as a lowercase constant for a fast, checksum-agnostic comparison. */
+const ZERO_ADDRESS = zeroAddress.toLowerCase()
 
 @Injectable()
 export class UsersService extends MyService<User> {
@@ -72,10 +81,45 @@ export class UsersService extends MyService<User> {
     return user
   }
 
-  /** Persist the caller's smart-account / wallet address (lowercased for stable comparison). */
-  async setWallet(id: string, walletAddress: string): Promise<User> {
+  /**
+   * Persist the caller's smart-account / wallet address (lowercased for stable comparison).
+   *
+   * mvmnt-style signature proof: when the FE supplies `message` + `signature`, we recover the
+   * signer with viem `recoverMessageAddress` (the same idea as mvmnt's `validateWalletSignature`
+   * ethers `verifyMessage`). A signature that recovers a valid, non-zero EOA proves the caller
+   * controls the underlying Web3Auth key before we trust the smart-account address they claim.
+   *
+   * ponytail: message/signature are still optional for backward-compat while the FE rolls out;
+   * once the FE always sends them, make both required here and drop the absent-proof branch.
+   */
+  async setWallet(id: string, dto: SetWalletDto): Promise<User> {
+    const { walletAddress, message, signature } = dto
+
+    if (message && signature) {
+      await this.verifyOwnershipSignature(message, signature)
+    }
+
     const user = await this.getProfile(id)
     user.walletAddress = walletAddress.toLowerCase()
     return this.users.save(user)
+  }
+
+  /**
+   * Recover the EOA that produced `signature` over `message`. Throws 401 when the signature is
+   * malformed or recovers the zero / an invalid address. Does not bind the recovered EOA to the
+   * smart account here (Web3Auth derives the smart account from that EOA), so a valid recovery is
+   * sufficient proof of key control for this endpoint.
+   */
+  private async verifyOwnershipSignature(message: string, signature: string): Promise<void> {
+    let recovered: string
+    try {
+      recovered = await recoverMessageAddress({ message, signature: signature as `0x${string}` })
+    } catch {
+      throw new UnauthorizedException('Invalid wallet ownership signature')
+    }
+
+    if (!isAddress(recovered) || recovered.toLowerCase() === ZERO_ADDRESS) {
+      throw new UnauthorizedException('Invalid wallet ownership signature')
+    }
   }
 }

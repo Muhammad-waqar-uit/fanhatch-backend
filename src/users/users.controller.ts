@@ -42,6 +42,6 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Persist the caller smart-account / wallet address' })
   async setWallet(@CurrentUser('id') userId: string, @Body() dto: SetWalletDto) {
-    return (await this.usersService.setWallet(userId, dto.walletAddress)).toResponseObject()
+    return (await this.usersService.setWallet(userId, dto)).toResponseObject()
   }
 }
