@@ -43,6 +43,29 @@ export class UsersService extends MyService<User> {
     return bcrypt.compare(password, user.passwordHash)
   }
 
+  /**
+   * SIWE find-or-create. Wallet addresses are stored lowercased so lookups are
+   * case-insensitive regardless of the EIP-55 checksum the wallet sends.
+   * A wallet-only account gets synthetic email/username and an unusable random
+   * passwordHash (non-null column) — the user can never log in via password
+   * until they set one through a dedicated flow.
+   */
+  async findOrCreateByWallet(address: string): Promise<User> {
+    const walletAddress = address.toLowerCase()
+    const existing = await this.users.findOne({ where: { walletAddress } })
+    if (existing) return existing
+
+    const short = walletAddress.slice(2, 14)
+    const passwordHash = await bcrypt.hash(`siwe:${walletAddress}:${Date.now()}`, 10)
+    const user = this.users.create({
+      email: `${walletAddress}@wallet.fans.tech`,
+      username: `wallet_${short}`,
+      passwordHash,
+      walletAddress,
+    })
+    return this.users.save(user)
+  }
+
   async getProfile(id: string): Promise<User> {
     const user = await this.users.findOne({ where: { id } })
     if (!user) throw new NotFoundException('User not found')
