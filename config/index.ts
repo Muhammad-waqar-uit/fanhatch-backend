@@ -9,5 +9,6 @@ import dbConfig from './db.config'
 import jwtConfig from './jwt.config'
 import corsConfig from './cors.config'
 import swaggerConfig from './swagger.config'
+import chainConfig from './chain.config'
 
-export { rootConfig, dbConfig, jwtConfig, corsConfig, swaggerConfig }
+export { rootConfig, dbConfig, jwtConfig, corsConfig, swaggerConfig, chainConfig }
