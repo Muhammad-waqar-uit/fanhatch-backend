@@ -58,8 +58,11 @@ export class IndexerService implements OnModuleInit {
       this.logger.log('indexer disabled (needs chain.enabled && RUN_WORKERS=true) — poll loop no-ops')
       return
     }
-    this.logger.log('indexer enabled — starting initial backfill')
-    await this.sync()
+    this.logger.log('indexer enabled — starting initial backfill (detached)')
+    // Detached: the backfill can take minutes on a rate-limited RPC (small getLogs
+    // ranges). Awaiting it here would block app bootstrap / HTTP listen. sync() catches
+    // its own errors and the `running` guard keeps the @Interval poll from overlapping.
+    void this.sync()
   }
 
   /** Poll tick. No-ops unless gated on. */
