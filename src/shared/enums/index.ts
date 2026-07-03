@@ -12,6 +12,9 @@ export enum OrderDirection {
 export enum UserRole {
   USER = 'user',
   ADMIN = 'admin',
+  // Reserved for a future platform owner. No admin controls/endpoints exist yet —
+  // this only makes the type available so a superadmin can be provisioned later.
+  SUPERADMIN = 'superadmin',
 }
 
 /** i18n / error message keys. Extend as modules are added. */
