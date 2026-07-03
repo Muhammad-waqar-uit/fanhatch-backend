@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger'
-import { IsEmail, IsOptional, IsString, Matches, MinLength } from 'class-validator'
+import { IsEmail, IsEthereumAddress, IsOptional, IsString, Matches, MinLength } from 'class-validator'
 import { PaginateDto } from '@app/shared/dto'
 
 export class CreateUserDto {
@@ -49,3 +49,9 @@ class UpdatableUserFields {
 export class UpdateUserDto extends PartialType(UpdatableUserFields) {}
 
 export class QueryUsersDto extends PaginateDto {}
+
+export class SetWalletDto {
+  @ApiProperty({ description: 'Smart-account / wallet address (EIP-55 or lowercase)' })
+  @IsEthereumAddress()
+  walletAddress: string
+}

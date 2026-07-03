@@ -47,4 +47,19 @@ export class AuthController {
   me(@CurrentUser() user: IAuthUser) {
     return user
   }
+
+  @Get('web3auth/token')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Mint a fresh Web3Auth SFA id-token for the current session' })
+  web3authToken(@CurrentUser() user: IAuthUser) {
+    return this.authService.mintWeb3AuthToken(user)
+  }
+
+  @Get('jwks')
+  @Public()
+  @ApiOperation({ summary: 'Public JWKS — configure this URL in the Web3Auth custom verifier' })
+  jwks() {
+    return this.authService.getWeb3AuthJwks()
+  }
 }

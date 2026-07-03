@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { CurrentUser, JwtAuthGuard } from '@app/shared/auth'
-import { QueryUsersDto, UpdateUserDto } from './dto'
+import { QueryUsersDto, SetWalletDto, UpdateUserDto } from './dto'
 import { UsersService } from './users.service'
 
 @ApiTags('Users')
@@ -35,5 +35,13 @@ export class UsersController {
   @ApiOperation({ summary: 'Update current user profile' })
   async update(@CurrentUser('id') userId: string, @Body() dto: UpdateUserDto) {
     return (await this.usersService.update(userId, dto)).toResponseObject()
+  }
+
+  @Patch('me/wallet')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Persist the caller smart-account / wallet address' })
+  async setWallet(@CurrentUser('id') userId: string, @Body() dto: SetWalletDto) {
+    return (await this.usersService.setWallet(userId, dto.walletAddress)).toResponseObject()
   }
 }

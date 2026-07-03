@@ -71,4 +71,11 @@ export class UsersService extends MyService<User> {
     if (!user) throw new NotFoundException('User not found')
     return user
   }
+
+  /** Persist the caller's smart-account / wallet address (lowercased for stable comparison). */
+  async setWallet(id: string, walletAddress: string): Promise<User> {
+    const user = await this.getProfile(id)
+    user.walletAddress = walletAddress.toLowerCase()
+    return this.users.save(user)
+  }
 }
