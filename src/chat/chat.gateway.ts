@@ -14,6 +14,7 @@ import { Server, Socket } from 'socket.io'
 import { IJwtPayload } from '@app/shared/interfaces'
 import { RoomService } from './room.service'
 import { MessageService } from './message.service'
+import { KeyRequiredException } from './membership/membership.service'
 
 /** Per-socket send rate limit: max 5 messages per rolling second. */
 const RATE_LIMIT = 5
@@ -73,7 +74,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       client.emit('room:joined', { roomId: body.roomId })
       return { ok: true, data: { roomId: body.roomId } }
     } catch (err) {
-      return this.fail(client, 'FORBIDDEN', (err as Error).message)
+      // Key-gated club denial surfaces a stable KEY_REQUIRED code to the client.
+      const code = err instanceof KeyRequiredException ? 'KEY_REQUIRED' : 'FORBIDDEN'
+      return this.fail(client, code, (err as Error).message)
     }
   }
 

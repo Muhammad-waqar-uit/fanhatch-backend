@@ -4,7 +4,11 @@ import { Repository } from 'typeorm'
 import { ChatRoom, ChatRoomType } from './entities/chat-room.entity'
 import { RoomMember, RoomMemberRole } from './entities/room-member.entity'
 import { ChatRoomDto, CreateRoomDto } from './dto'
-import { MEMBERSHIP_SERVICE, MembershipService } from './membership/membership.service'
+import {
+  KeyRequiredException,
+  MEMBERSHIP_SERVICE,
+  MembershipService,
+} from './membership/membership.service'
 import { MessageService } from './message.service'
 
 @Injectable()
@@ -81,6 +85,9 @@ export class RoomService {
   async assertAccess(userId: string, roomId: string): Promise<ChatRoom> {
     const room = await this.getRoom(roomId)
     if (!(await this.membership.canAccess(userId, room))) {
+      // Club denial → key gate (403 "Key required to join this club" / KEY_REQUIRED);
+      // dm/group denial → generic forbidden.
+      if (room.type === ChatRoomType.CLUB) throw new KeyRequiredException()
       throw new ForbiddenException('You do not have access to this room')
     }
     return room

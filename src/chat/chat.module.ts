@@ -6,6 +6,7 @@ import { User } from '@app/src/users/user.entity'
 import { ChatRoom } from './entities/chat-room.entity'
 import { RoomMember } from './entities/room-member.entity'
 import { ChatMessage } from './entities/chat-message.entity'
+import { Holding } from '../clubs/entities/holding.entity'
 import { ChatController } from './chat.controller'
 import { ChatGateway } from './chat.gateway'
 import { RoomService } from './room.service'
@@ -14,7 +15,7 @@ import { MEMBERSHIP_SERVICE, Web2MembershipService } from './membership/membersh
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([ChatRoom, RoomMember, ChatMessage, User]),
+    TypeOrmModule.forFeature([ChatRoom, RoomMember, ChatMessage, User, Holding]),
     JwtModule.registerAsync({
       inject: [ConfigService],
       imports: [ConfigModule],
