@@ -21,6 +21,7 @@ import { SocialModule } from './social/social.module'
 import { WalletModule } from './wallet/wallet.module'
 import { LpModule } from './lp/lp.module'
 import { PostsModule } from './posts/posts.module'
+import { NotificationsModule } from './notifications/notifications.module'
 
 @Module({
   imports: [
@@ -74,6 +75,7 @@ import { PostsModule } from './posts/posts.module'
     WalletModule,
     LpModule,
     PostsModule,
+    NotificationsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
