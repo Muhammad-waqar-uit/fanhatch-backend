@@ -1,9 +1,11 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { PaginateRO } from '@app/shared/dto'
 import { User } from '@app/src/users/user.entity'
 import { RoomService } from '@app/src/chat/room.service'
+import { NotificationsService } from '@app/src/notifications/notifications.service'
+import { NotificationRelatedTo, NotificationType } from '@app/src/notifications/enums'
 import { Club, ClubCurveType } from './entities/club.entity'
 import { Holding } from './entities/holding.entity'
 import { Vote } from './entities/vote.entity'
@@ -24,12 +26,15 @@ const money = (n: number): string => n.toFixed(8)
 
 @Injectable()
 export class ClubsService {
+  private readonly logger = new Logger(ClubsService.name)
+
   constructor(
     @InjectRepository(Club) private readonly clubs: Repository<Club>,
     @InjectRepository(Holding) private readonly holdings: Repository<Holding>,
     @InjectRepository(Vote) private readonly votes: Repository<Vote>,
     @InjectRepository(User) private readonly users: Repository<User>,
     private readonly rooms: RoomService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /** Create a club: assign clubId/ftId, seed the creator's holding + chat room. */
@@ -152,7 +157,7 @@ export class ClubsService {
     const recipient = await this.users.findOne({ where: { id: toUserId } })
     if (!recipient) throw new NotFoundException('Recipient not found')
 
-    return this.holdings.manager.transaction(async (manager) => {
+    const result = await this.holdings.manager.transaction(async (manager) => {
       const clubRepo = manager.getRepository(Club)
       const holdingRepo = manager.getRepository(Holding)
 
@@ -184,6 +189,30 @@ export class ClubsService {
         club: { id: club.id, memberCount: club.memberCount },
       }
     })
+
+    // Best-effort notification (never breaks the gift itself).
+    try {
+      const actor = await this.users.findOne({ where: { id: fromUserId } })
+      const actorName = actor?.username ?? 'Someone'
+      await this.notifications.create({
+        userId: toUserId,
+        type: NotificationType.GIFT_RECEIVED,
+        relatedTo: NotificationRelatedTo.GIFT,
+        title: `${actorName} gifted you ${amount} key(s) to ${club.name}`,
+        data: {
+          actorId: fromUserId,
+          actorName,
+          actorAvatarUrl: actor?.avatarUrl,
+          clubId: club.id,
+          clubName: club.name,
+          amount,
+        },
+      })
+    } catch (err) {
+      this.logger.warn(`GIFT_RECEIVED notification failed: ${(err as Error).message}`)
+    }
+
+    return result
   }
 
   /**
@@ -231,6 +260,38 @@ export class ClubsService {
       club.presidentId = candidateId
       await this.clubs.save(club)
       elected = true
+    }
+
+    // Best-effort governance notifications (never break the vote itself).
+    try {
+      const voter = await this.users.findOne({ where: { id: voterId } })
+      const actorName = voter?.username ?? 'Someone'
+      await this.notifications.create({
+        userId: candidateId,
+        type: NotificationType.VOTE_RECEIVED,
+        relatedTo: NotificationRelatedTo.VOTE,
+        title: `${actorName} voted for you in ${club.name}`,
+        data: {
+          actorId: voterId,
+          actorName,
+          actorAvatarUrl: voter?.avatarUrl,
+          clubId: club.id,
+          clubName: club.name,
+          votes: tally,
+        },
+      })
+
+      if (elected) {
+        await this.notifications.create({
+          userId: candidateId,
+          type: NotificationType.PRESIDENT_ELECTED,
+          relatedTo: NotificationRelatedTo.VOTE,
+          title: `You were elected president of ${club.name}`,
+          data: { clubId: club.id, clubName: club.name },
+        })
+      }
+    } catch (err) {
+      this.logger.warn(`Governance notification failed: ${(err as Error).message}`)
     }
 
     return { candidateId, votes: tally, elected, presidentId: club.presidentId ?? null }

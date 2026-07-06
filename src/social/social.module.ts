@@ -3,12 +3,13 @@ import { TypeOrmModule } from '@nestjs/typeorm'
 import { User } from '@app/src/users/user.entity'
 import { Club } from '@app/src/clubs/entities/club.entity'
 import { Holding } from '@app/src/clubs/entities/holding.entity'
+import { NotificationsModule } from '@app/src/notifications/notifications.module'
 import { Follow } from './entities/follow.entity'
 import { SocialController } from './social.controller'
 import { SocialService } from './social.service'
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Follow, User, Holding, Club])],
+  imports: [TypeOrmModule.forFeature([Follow, User, Holding, Club]), NotificationsModule],
   controllers: [SocialController],
   providers: [SocialService],
   exports: [SocialService],

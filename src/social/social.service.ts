@@ -1,10 +1,12 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common'
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { In, LessThanOrEqual, Repository } from 'typeorm'
 import { PaginateRO } from '@app/shared/dto'
 import { User } from '@app/src/users/user.entity'
 import { Club } from '@app/src/clubs/entities/club.entity'
 import { Holding } from '@app/src/clubs/entities/holding.entity'
+import { NotificationsService } from '@app/src/notifications/notifications.service'
+import { NotificationRelatedTo, NotificationType } from '@app/src/notifications/enums'
 import { Follow } from './entities/follow.entity'
 import {
   ActivityDto,
@@ -17,11 +19,14 @@ import {
 
 @Injectable()
 export class SocialService {
+  private readonly logger = new Logger(SocialService.name)
+
   constructor(
     @InjectRepository(Follow) private readonly follows: Repository<Follow>,
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(Holding) private readonly holdings: Repository<Holding>,
     @InjectRepository(Club) private readonly clubs: Repository<Club>,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // ---- Follows -----------------------------------------------------------
@@ -33,6 +38,21 @@ export class SocialService {
     const existing = await this.follows.findOne({ where: { followerId, followeeId } })
     if (!existing) {
       await this.follows.save(this.follows.create({ followerId, followeeId }))
+
+      // Best-effort notification (never breaks the follow itself).
+      try {
+        const actor = await this.users.findOne({ where: { id: followerId } })
+        const actorName = actor?.username ?? 'Someone'
+        await this.notifications.create({
+          userId: followeeId,
+          type: NotificationType.FOLLOWED,
+          relatedTo: NotificationRelatedTo.USER,
+          title: `${actorName} followed you`,
+          data: { actorId: followerId, actorName, actorAvatarUrl: actor?.avatarUrl },
+        })
+      } catch (err) {
+        this.logger.warn(`FOLLOWED notification failed: ${(err as Error).message}`)
+      }
     }
     return { following: true }
   }

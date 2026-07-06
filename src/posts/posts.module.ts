@@ -3,9 +3,11 @@ import { BullModule } from '@nestjs/bullmq'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { User } from '@app/src/users/user.entity'
 import { Club } from '@app/src/clubs/entities/club.entity'
+import { Holding } from '@app/src/clubs/entities/holding.entity'
 import { isRedisConfigured } from '@app/shared/redis/redis.util'
 import { POST_PUBLISH_QUEUE } from '@app/shared/constant/queues'
 import { TaskSchedulerModule } from '@app/src/task-scheduler/task-scheduler.module'
+import { NotificationsModule } from '@app/src/notifications/notifications.module'
 import { Post } from './entities/post.entity'
 import { PostLike } from './entities/post-like.entity'
 import { Trade } from './entities/trade.entity'
@@ -26,7 +28,8 @@ const runWorkers = process.env.RUN_WORKERS !== 'false'
 // CronScheduler is picked up without importing ScheduleModule here.
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Post, PostLike, Trade, User, Club]),
+    TypeOrmModule.forFeature([Post, PostLike, Trade, User, Club, Holding]),
+    NotificationsModule,
     ...(redis ? [BullModule.registerQueue({ name: POST_PUBLISH_QUEUE }), TaskSchedulerModule] : []),
   ],
   controllers: [PostsController],

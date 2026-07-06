@@ -3,12 +3,16 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { In, LessThanOrEqual, Repository } from 'typeorm'
 import { User } from '@app/src/users/user.entity'
 import { Club } from '@app/src/clubs/entities/club.entity'
+import { Holding } from '@app/src/clubs/entities/holding.entity'
+import { NotificationsService } from '@app/src/notifications/notifications.service'
+import { NotificationRelatedTo, NotificationType } from '@app/src/notifications/enums'
 import { Post, PostStatus } from './entities/post.entity'
 import { PostLike } from './entities/post-like.entity'
 import { Trade } from './entities/trade.entity'
@@ -27,13 +31,17 @@ import {
 
 @Injectable()
 export class PostsService {
+  private readonly logger = new Logger(PostsService.name)
+
   constructor(
     @InjectRepository(Post) private readonly posts: Repository<Post>,
     @InjectRepository(PostLike) private readonly likes: Repository<PostLike>,
     @InjectRepository(Trade) private readonly trades: Repository<Trade>,
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(Club) private readonly clubs: Repository<Club>,
+    @InjectRepository(Holding) private readonly holdings: Repository<Holding>,
     @Inject(POST_SCHEDULER) private readonly scheduler: PostScheduler,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /** Create a post authored by the JWT user. */
@@ -58,6 +66,10 @@ export class PostsService {
 
     if (status === PostStatus.SCHEDULED && scheduledAt) {
       this.scheduler.onScheduled(post.id, scheduledAt)
+    }
+
+    if (post.status === PostStatus.PUBLISHED) {
+      await this.notifyPostPublished(post)
     }
 
     const authors = await this.userMap([authorId])
@@ -111,6 +123,7 @@ export class PostsService {
       post.status = PostStatus.PUBLISHED
       post.publishedAt = post.publishedAt ?? new Date()
       if (prevStatus === PostStatus.SCHEDULED) this.scheduler.onCancelled(post.id)
+      if (prevStatus !== PostStatus.PUBLISHED) await this.notifyPostPublished(post)
     } else {
       // → draft (cancel a schedule) or a plain body edit on a draft.
       if (dto.scheduledAt !== undefined) post.scheduledAt = nextScheduledAt
@@ -134,11 +147,13 @@ export class PostsService {
   /** Author-only force-publish (draft/scheduled → published now). */
   async publishPost(userId: string, id: string): Promise<PostDto> {
     const post = await this.assertAuthor(id, userId)
+    const wasPublished = post.status === PostStatus.PUBLISHED
     const wasScheduled = post.status === PostStatus.SCHEDULED
     post.status = PostStatus.PUBLISHED
     post.publishedAt = new Date()
     const saved = await this.posts.save(post)
     if (wasScheduled) this.scheduler.onCancelled(post.id)
+    if (!wasPublished) await this.notifyPostPublished(saved)
     const authors = await this.userMap([userId])
     return this.toPostDto(saved, 0, false, authors)
   }
@@ -170,7 +185,52 @@ export class PostsService {
       { id: postId, status: PostStatus.SCHEDULED },
       { status: PostStatus.PUBLISHED, publishedAt: () => 'now()' },
     )
-    return (result.affected ?? 0) > 0
+    const published = (result.affected ?? 0) > 0
+    if (published) {
+      const post = await this.posts.findOne({ where: { id: postId } })
+      if (post) await this.notifyPostPublished(post)
+    }
+    return published
+  }
+
+  /**
+   * Best-effort POST_PUBLISHED fan-out to holders of the author's club. Resolves
+   * the author's primary (first-created) club, gathers its distinct holder ids,
+   * and hands them to `notifyMany` (which excludes the author + de-dupes). A
+   * notification failure never breaks the underlying publish.
+   */
+  private async notifyPostPublished(post: Post): Promise<void> {
+    try {
+      const club = await this.clubs.findOne({
+        where: { creatorId: post.authorId },
+        order: { created: 'ASC' },
+      })
+      if (!club) return
+
+      const holdings = await this.holdings.find({ where: { clubId: club.id } })
+      const holderIds = [...new Set(holdings.map((h) => h.userId))]
+      if (!holderIds.length) return
+
+      const author = await this.users.findOne({ where: { id: post.authorId } })
+      const actorName = author?.username ?? 'Someone'
+      const excerpt = post.body.length > 140 ? `${post.body.slice(0, 137)}...` : post.body
+
+      await this.notifications.notifyMany(holderIds, {
+        type: NotificationType.POST_PUBLISHED,
+        relatedTo: NotificationRelatedTo.POST,
+        title: `${actorName} published a new post`,
+        data: {
+          actorId: post.authorId,
+          actorName,
+          actorAvatarUrl: author?.avatarUrl,
+          clubId: club.id,
+          postId: post.id,
+          excerpt,
+        },
+      })
+    } catch (err) {
+      this.logger.warn(`POST_PUBLISHED notification failed: ${(err as Error).message}`)
+    }
   }
 
   /**
