@@ -6,7 +6,6 @@ import { JwtStrategy } from '@app/shared/auth'
 import { UsersModule } from '@app/src/users/users.module'
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
-import { Web3AuthTokenService } from './web3auth-token.service'
 
 @Module({
   imports: [
@@ -22,6 +21,6 @@ import { Web3AuthTokenService } from './web3auth-token.service'
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, Web3AuthTokenService],
+  providers: [AuthService, JwtStrategy],
 })
 export class AuthModule {}

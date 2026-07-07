@@ -4,9 +4,7 @@ import { SiweMessage, generateNonce } from 'siwe'
 import { IJwtPayload } from '@app/shared/interfaces'
 import { User } from '@app/src/users/user.entity'
 import { UsersService } from '@app/src/users/users.service'
-import { IAuthUser } from '@app/shared/interfaces'
 import { LoginDto, RegisterDto, SiweVerifyDto } from './dto'
-import { Web3AuthTokenService } from './web3auth-token.service'
 
 /** How long an issued SIWE nonce stays valid before it must be re-requested. */
 const NONCE_TTL_MS = 5 * 60 * 1000
@@ -25,18 +23,7 @@ export class AuthService {
   constructor(
     private readonly users: UsersService,
     private readonly jwt: JwtService,
-    private readonly web3auth: Web3AuthTokenService,
   ) {}
-
-  /** Mint a fresh Web3Auth SFA id-token for an already-authenticated principal. */
-  mintWeb3AuthToken(user: IAuthUser): { web3authToken: string } {
-    return { web3authToken: this.web3auth.mintIdToken({ id: user.id, email: user.email }) }
-  }
-
-  /** Public JWKS for the Web3Auth custom-verifier config. */
-  getWeb3AuthJwks() {
-    return this.web3auth.getJwks()
-  }
 
   async register(dto: RegisterDto) {
     const user = await this.users.createWithPassword(dto)
@@ -103,8 +90,6 @@ export class AuthService {
     const payload: IJwtPayload = { sub: user.id, email: user.email, role: user.role }
     return {
       accessToken: this.jwt.sign(payload),
-      // RS256 id-token for the Web3Auth SFA background-wallet flow (see web3-sfa-contract.md).
-      web3authToken: this.web3auth.mintIdToken({ id: user.id, email: user.email, name: user.username }),
       user: user.toResponseObject(),
     }
   }
