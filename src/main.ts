@@ -1,3 +1,8 @@
+// Run the whole process in UTC so every `Date`, log timestamp, and DB write is
+// timezone-consistent regardless of the host's locale. Must precede any import
+// that could read the clock at load time.
+process.env.TZ = 'UTC'
+
 import 'dotenv/config'
 import { json } from 'body-parser'
 import compression from 'compression'
@@ -28,6 +33,12 @@ async function runPendingMigrations(app: import('@nestjs/common').INestApplicati
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule)
+
+  // Close DB/Redis/BullMQ connections cleanly on SIGTERM/SIGINT (triggers
+  // NestJS onModuleDestroy / OnApplicationShutdown hooks) so deploys don't
+  // drop in-flight work or leak connections.
+  app.enableShutdownHooks()
+
   const config = app.get(ConfigService)
 
   app.useGlobalPipes(

@@ -1,3 +1,7 @@
+// Run the worker in UTC so every `Date`, log timestamp, and DB write is
+// timezone-consistent with the API process regardless of the host's locale.
+process.env.TZ = 'UTC'
+
 import 'dotenv/config'
 import { Logger } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
