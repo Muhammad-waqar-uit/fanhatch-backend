@@ -1,9 +1,11 @@
+import { join } from 'node:path'
 import { Module } from '@nestjs/common'
 import { APP_GUARD } from '@nestjs/core'
 import { CacheModule } from '@nestjs/cache-manager'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { EventEmitterModule } from '@nestjs/event-emitter'
 import { ScheduleModule } from '@nestjs/schedule'
+import { ServeStaticModule } from '@nestjs/serve-static'
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { rootConfig, dbConfig, jwtConfig, corsConfig, swaggerConfig, chainConfig } from '@app/config'
@@ -24,6 +26,7 @@ import { PostsModule } from './posts/posts.module'
 import { DiscoverModule } from './discover/discover.module'
 import { PremiumModule } from './premium/premium.module'
 import { ReferralsModule } from './referrals/referrals.module'
+import { MediaModule } from './media/media.module'
 import { NotificationsModule } from './notifications/notifications.module'
 
 @Module({
@@ -81,7 +84,17 @@ import { NotificationsModule } from './notifications/notifications.module'
     DiscoverModule,
     PremiumModule,
     ReferralsModule,
+    MediaModule,
     NotificationsModule,
+    // Serve local-disk uploads at /uploads (skipped when using S3).
+    ...(process.env.STORAGE_DRIVER === 's3'
+      ? []
+      : [
+          ServeStaticModule.forRoot({
+            rootPath: join(process.cwd(), process.env.UPLOAD_DIR ?? './uploads'),
+            serveRoot: '/uploads',
+          }),
+        ]),
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
