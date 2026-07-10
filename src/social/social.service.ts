@@ -196,6 +196,7 @@ export class SocialService {
       keyPrice: primaryClub?.keyPrice,
       ownKeyCount,
       viewerRelation: relation,
+      joinedAt: user.created.toISOString(),
       lastSeen: user.updated?.toISOString(),
     }
   }

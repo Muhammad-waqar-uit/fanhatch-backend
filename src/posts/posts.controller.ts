@@ -12,7 +12,13 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { CurrentUser, JwtAuthGuard, OptionalJwtAuthGuard } from '@app/shared/auth'
 import { PostsService } from './posts.service'
-import { CreatePostDto, FeedQueryDto, MinePostsQueryDto, UpdatePostDto } from './dto'
+import {
+  CreatePostDto,
+  FeedQueryDto,
+  MinePostsQueryDto,
+  PageQueryDto,
+  UpdatePostDto,
+} from './dto'
 
 @ApiTags('Home')
 @Controller()
@@ -84,6 +90,64 @@ export class PostsController {
   @ApiOperation({ summary: 'Unlike a post' })
   unlike(@Param('id') id: string, @CurrentUser('id') userId: string) {
     return this.posts.unlike(id, userId)
+  }
+
+  @Post('posts/:id/repost')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Repost a post' })
+  repost(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.posts.repost(id, userId)
+  }
+
+  @Delete('posts/:id/repost')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Undo a repost' })
+  unrepost(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.posts.unrepost(id, userId)
+  }
+
+  @Post('posts/:id/bookmark')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Bookmark a post' })
+  bookmark(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.posts.bookmark(id, userId)
+  }
+
+  @Delete('posts/:id/bookmark')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Remove a bookmark' })
+  unbookmark(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.posts.unbookmark(id, userId)
+  }
+
+  @Get('bookmarks')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "The caller's bookmarked posts (newest-bookmarked first)" })
+  bookmarks(@CurrentUser('id') userId: string, @Query() query: PageQueryDto) {
+    return this.posts.listBookmarks(userId, query.page, query.limit)
+  }
+
+  @Get('posts/:id/replies')
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Replies to a post (oldest-first, paginated)' })
+  replies(
+    @Param('id') id: string,
+    @Query() query: PageQueryDto,
+    @CurrentUser('id') userId?: string,
+  ) {
+    return this.posts.listReplies(id, query.page, query.limit, userId)
+  }
+
+  @Get('posts/:id')
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'A single post with viewer-scoped flags' })
+  getPost(@Param('id') id: string, @CurrentUser('id') userId?: string) {
+    return this.posts.getPost(id, userId)
   }
 
   @Get('trending')

@@ -12,6 +12,8 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { CurrentUser, JwtAuthGuard, OptionalJwtAuthGuard } from '@app/shared/auth'
 import { IAuthUser } from '@app/shared/interfaces'
+import { PostsService } from '@app/src/posts/posts.service'
+import { PageQueryDto } from '@app/src/posts/dto'
 import { SocialService } from './social.service'
 import { ActivityQueryDto, FollowListQueryDto, UpdateProfileDto } from './dto'
 
@@ -24,7 +26,10 @@ import { ActivityQueryDto, FollowListQueryDto, UpdateProfileDto } from './dto'
 @ApiTags('Social')
 @Controller('users')
 export class SocialController {
-  constructor(private readonly social: SocialService) {}
+  constructor(
+    private readonly social: SocialService,
+    private readonly posts: PostsService,
+  ) {}
 
   @Get('handle/:handle')
   @UseGuards(OptionalJwtAuthGuard)
@@ -91,5 +96,38 @@ export class SocialController {
   @ApiOperation({ summary: 'Activity feed (trades/posts — stub for now)' })
   activity(@Param('id') id: string, @Query() query: ActivityQueryDto) {
     return this.social.activity(id, query.page, query.limit)
+  }
+
+  @Get(':id/posts')
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: "A user's top-level posts (replies excluded, paginated)" })
+  userPosts(
+    @Param('id') id: string,
+    @Query() query: PageQueryDto,
+    @CurrentUser('id') viewerId?: string,
+  ) {
+    return this.posts.listUserPosts(id, query.page, query.limit, viewerId)
+  }
+
+  @Get(':id/replies')
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: "A user's replies (paginated)" })
+  userReplies(
+    @Param('id') id: string,
+    @Query() query: PageQueryDto,
+    @CurrentUser('id') viewerId?: string,
+  ) {
+    return this.posts.listUserReplies(id, query.page, query.limit, viewerId)
+  }
+
+  @Get(':id/likes')
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Posts a user liked (paginated)' })
+  userLikes(
+    @Param('id') id: string,
+    @Query() query: PageQueryDto,
+    @CurrentUser('id') viewerId?: string,
+  ) {
+    return this.posts.listUserLikes(id, query.page, query.limit, viewerId)
   }
 }

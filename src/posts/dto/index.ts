@@ -8,6 +8,7 @@ import {
   IsISO8601,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   Min,
 } from 'class-validator'
@@ -21,6 +22,11 @@ export class CreatePostDto {
   @IsString()
   @MaxLength(2000)
   body: string
+
+  @ApiPropertyOptional({ description: 'Parent post id — set to make this post a reply' })
+  @IsOptional()
+  @IsUUID()
+  parentId?: string
 
   @ApiPropertyOptional({ enum: PostStatus, default: PostStatus.PUBLISHED })
   @IsOptional()
@@ -179,6 +185,33 @@ export class LikeResultDto {
   @ApiProperty() likes: number
 }
 
+export class RepostResultDto {
+  @ApiProperty() reposted: boolean
+  @ApiProperty() reposts: number
+}
+
+export class BookmarkResultDto {
+  @ApiProperty() bookmarked: boolean
+  @ApiProperty() bookmarks: number
+}
+
+/** Simple page/limit query for post list endpoints (replies, bookmarks, tabs). */
+export class PageQueryDto {
+  @ApiPropertyOptional({ default: 1, minimum: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page = 1
+
+  @ApiPropertyOptional({ default: 20, minimum: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit = 20
+}
+
 export class MinePostsMetaDto {
   @ApiProperty() total: number
   @ApiProperty() page: number
@@ -188,6 +221,12 @@ export class MinePostsMetaDto {
 
 /** Paginated envelope for `GET /posts/me`. */
 export class MinePostsResponseDto {
+  @ApiProperty({ type: [PostDto] }) items: PostDto[]
+  @ApiProperty({ type: MinePostsMetaDto }) meta: MinePostsMetaDto
+}
+
+/** Paginated envelope for post lists (replies, bookmarks, profile tabs). */
+export class PaginatedPostsDto {
   @ApiProperty({ type: [PostDto] }) items: PostDto[]
   @ApiProperty({ type: MinePostsMetaDto }) meta: MinePostsMetaDto
 }

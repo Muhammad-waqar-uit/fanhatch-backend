@@ -67,6 +67,7 @@ export class ProfileDto {
   @ApiPropertyOptional() ownKeyCount?: number
   @ApiProperty({ enum: ['self', 'following', 'other', 'anonymous'] })
   viewerRelation: ViewerRelation
+  @ApiProperty({ description: 'ISO timestamp the user joined (user.created)' }) joinedAt: string
   @ApiPropertyOptional({ description: 'ISO timestamp' }) lastSeen?: string
 }
 

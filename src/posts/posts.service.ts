@@ -7,7 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { In, LessThanOrEqual, Repository } from 'typeorm'
+import { In, IsNull, LessThanOrEqual, Not, ObjectLiteral, Repository } from 'typeorm'
 import { User } from '@app/src/users/user.entity'
 import { Club } from '@app/src/clubs/entities/club.entity'
 import { Holding } from '@app/src/clubs/entities/holding.entity'
@@ -15,19 +15,35 @@ import { NotificationsService } from '@app/src/notifications/notifications.servi
 import { NotificationRelatedTo, NotificationType } from '@app/src/notifications/enums'
 import { Post, PostStatus } from './entities/post.entity'
 import { PostLike } from './entities/post-like.entity'
+import { PostRepost } from './entities/post-repost.entity'
+import { PostBookmark } from './entities/post-bookmark.entity'
 import { Trade } from './entities/trade.entity'
 import { POST_SCHEDULER, PostScheduler } from './scheduler/scheduler.service'
 import {
+  BookmarkResultDto,
   CreatePostDto,
   FeedFilter,
   FeedResponseDto,
   FeedUserDto,
   MinePostsResponseDto,
+  PaginatedPostsDto,
   PostDto,
+  RepostResultDto,
   TradeActivityDto,
   TrendingItemDto,
   UpdatePostDto,
 } from './dto'
+
+/** Per-post computed stats + viewer-scoped flags used to build a PostDto. */
+interface PostStatsView {
+  likes: number
+  comments: number
+  reposts: number
+  bookmarks: number
+  liked: boolean
+  reposted: boolean
+  bookmarked: boolean
+}
 
 @Injectable()
 export class PostsService {
@@ -36,6 +52,8 @@ export class PostsService {
   constructor(
     @InjectRepository(Post) private readonly posts: Repository<Post>,
     @InjectRepository(PostLike) private readonly likes: Repository<PostLike>,
+    @InjectRepository(PostRepost) private readonly reposts: Repository<PostRepost>,
+    @InjectRepository(PostBookmark) private readonly bookmarks: Repository<PostBookmark>,
     @InjectRepository(Trade) private readonly trades: Repository<Trade>,
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(Club) private readonly clubs: Repository<Club>,
@@ -44,7 +62,7 @@ export class PostsService {
     private readonly notifications: NotificationsService,
   ) {}
 
-  /** Create a post authored by the JWT user. */
+  /** Create a post authored by the JWT user. A `parentId` makes it a reply. */
   async createPost(authorId: string, dto: CreatePostDto): Promise<PostDto> {
     const status = dto.status ?? PostStatus.PUBLISHED
     let scheduledAt: Date | null = dto.scheduledAt ? new Date(dto.scheduledAt) : null
@@ -53,9 +71,12 @@ export class PostsService {
       scheduledAt = this.requireFuture(scheduledAt)
     }
 
+    if (dto.parentId) await this.assertPost(dto.parentId)
+
     const post = await this.posts.save(
       this.posts.create({
         authorId,
+        parentId: dto.parentId ?? null,
         body: dto.body,
         status,
         scheduledAt,
@@ -72,8 +93,7 @@ export class PostsService {
       await this.notifyPostPublished(post)
     }
 
-    const authors = await this.userMap([authorId])
-    return this.toPostDto(post, 0, false, authors)
+    return this.decorateOne(post, authorId)
   }
 
   /** The caller's posts, optionally filtered by status, newest first. */
@@ -90,8 +110,7 @@ export class PostsService {
       take: limit,
     })
 
-    const authors = await this.userMap([userId])
-    const items = rows.map((p) => this.toPostDto(p, 0, false, authors))
+    const items = await this.decoratePosts(rows, userId)
     return {
       items,
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) || 0 },
@@ -132,8 +151,7 @@ export class PostsService {
     }
 
     const saved = await this.posts.save(post)
-    const authors = await this.userMap([userId])
-    return this.toPostDto(saved, 0, false, authors)
+    return this.decorateOne(saved, userId)
   }
 
   /** Author-only delete. */
@@ -154,8 +172,7 @@ export class PostsService {
     const saved = await this.posts.save(post)
     if (wasScheduled) this.scheduler.onCancelled(post.id)
     if (!wasPublished) await this.notifyPostPublished(saved)
-    const authors = await this.userMap([userId])
-    return this.toPostDto(saved, 0, false, authors)
+    return this.decorateOne(saved, userId)
   }
 
   /**
@@ -234,8 +251,9 @@ export class PostsService {
   }
 
   /**
-   * Feed: `posts` → published posts only; `transactions` → trades only;
-   * `all` → both. `viewerId` (optional) drives the `liked` flag.
+   * Feed: `posts` → published top-level posts only (replies excluded);
+   * `transactions` → trades only; `all` → both. `viewerId` (optional) drives the
+   * per-viewer flags.
    */
   async feed(
     filter: FeedFilter,
@@ -252,6 +270,33 @@ export class PostsService {
     return { posts, trades }
   }
 
+  /** A single post with viewer-scoped flags (public, viewer optional). */
+  async getPost(id: string, viewerId?: string): Promise<PostDto> {
+    const post = await this.posts.findOne({ where: { id } })
+    if (!post) throw new NotFoundException('Post not found')
+    return this.decorateOne(post, viewerId)
+  }
+
+  /** Direct replies (children) of a post, oldest-first for thread readability. */
+  async listReplies(
+    id: string,
+    page: number,
+    limit: number,
+    viewerId?: string,
+  ): Promise<PaginatedPostsDto> {
+    await this.assertPost(id)
+    const [rows, total] = await this.posts.findAndCount({
+      where: { parentId: id },
+      order: { created: 'ASC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    })
+    const items = await this.decoratePosts(rows, viewerId)
+    return { items, meta: { total, page, limit, totalPages: Math.ceil(total / limit) || 0 } }
+  }
+
+  // ---- Likes -------------------------------------------------------------
+
   /** Toggle a like on. Returns the new like state + total like count. */
   async like(postId: string, userId: string) {
     await this.assertPost(postId)
@@ -267,6 +312,130 @@ export class PostsService {
     await this.assertPost(postId)
     await this.likes.delete({ postId, userId })
     return { liked: false, likes: await this.likes.count({ where: { postId } }) }
+  }
+
+  // ---- Reposts -----------------------------------------------------------
+
+  /** Repost (plain). Idempotent. Returns state + total repost count. */
+  async repost(postId: string, userId: string): Promise<RepostResultDto> {
+    await this.assertPost(postId)
+    const existing = await this.reposts.findOne({ where: { postId, userId } })
+    if (!existing) {
+      await this.reposts.save(this.reposts.create({ postId, userId }))
+    }
+    return { reposted: true, reposts: await this.reposts.count({ where: { postId } }) }
+  }
+
+  /** Undo a repost. Returns state + total repost count. */
+  async unrepost(postId: string, userId: string): Promise<RepostResultDto> {
+    await this.assertPost(postId)
+    await this.reposts.delete({ postId, userId })
+    return { reposted: false, reposts: await this.reposts.count({ where: { postId } }) }
+  }
+
+  // ---- Bookmarks ---------------------------------------------------------
+
+  /** Bookmark a post. Idempotent. Returns state + total bookmark count. */
+  async bookmark(postId: string, userId: string): Promise<BookmarkResultDto> {
+    await this.assertPost(postId)
+    const existing = await this.bookmarks.findOne({ where: { postId, userId } })
+    if (!existing) {
+      await this.bookmarks.save(this.bookmarks.create({ postId, userId }))
+    }
+    return { bookmarked: true, bookmarks: await this.bookmarks.count({ where: { postId } }) }
+  }
+
+  /** Remove a bookmark. Returns state + total bookmark count. */
+  async unbookmark(postId: string, userId: string): Promise<BookmarkResultDto> {
+    await this.assertPost(postId)
+    await this.bookmarks.delete({ postId, userId })
+    return { bookmarked: false, bookmarks: await this.bookmarks.count({ where: { postId } }) }
+  }
+
+  /** The caller's bookmarked posts, newest-bookmarked first. */
+  async listBookmarks(
+    userId: string,
+    page: number,
+    limit: number,
+  ): Promise<PaginatedPostsDto> {
+    const [rows, total] = await this.bookmarks.findAndCount({
+      where: { userId },
+      order: { created: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    })
+    const posts = await this.postsByIdsInOrder(rows.map((b) => b.postId))
+    const items = await this.decoratePosts(posts, userId)
+    return { items, meta: { total, page, limit, totalPages: Math.ceil(total / limit) || 0 } }
+  }
+
+  // ---- Profile tabs ------------------------------------------------------
+
+  /** A user's published top-level posts (replies excluded), newest first. */
+  async listUserPosts(
+    userId: string,
+    page: number,
+    limit: number,
+    viewerId?: string,
+  ): Promise<PaginatedPostsDto> {
+    return this.listAuthored(
+      { authorId: userId, status: PostStatus.PUBLISHED, parentId: IsNull() },
+      page,
+      limit,
+      viewerId,
+    )
+  }
+
+  /** A user's published replies (posts with a parent), newest first. */
+  async listUserReplies(
+    userId: string,
+    page: number,
+    limit: number,
+    viewerId?: string,
+  ): Promise<PaginatedPostsDto> {
+    return this.listAuthored(
+      { authorId: userId, status: PostStatus.PUBLISHED, parentId: Not(IsNull()) },
+      page,
+      limit,
+      viewerId,
+    )
+  }
+
+  /** Posts a user liked, newest-liked first. */
+  async listUserLikes(
+    userId: string,
+    page: number,
+    limit: number,
+    viewerId?: string,
+  ): Promise<PaginatedPostsDto> {
+    const [rows, total] = await this.likes.findAndCount({
+      where: { userId },
+      order: { created: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    })
+    const posts = await this.postsByIdsInOrder(rows.map((l) => l.postId))
+    const items = await this.decoratePosts(posts, viewerId)
+    return { items, meta: { total, page, limit, totalPages: Math.ceil(total / limit) || 0 } }
+  }
+
+  /**
+   * Search published, top-level posts by body (parameterized ILIKE), newest
+   * first. Reuses the shared PostDto mapping so counts + viewer flags match the
+   * feed. `viewerId` optional — flags are all-false when anonymous.
+   */
+  async searchPosts(q: string, limit = 10, viewerId?: string): Promise<PostDto[]> {
+    const term = q.trim()
+    if (!term) return []
+    const rows = await this.posts
+      .createQueryBuilder('p')
+      .where('p.status = :status', { status: PostStatus.PUBLISHED })
+      .andWhere('p.parentId IS NULL')
+      .andWhere('p.body ILIKE :like', { like: `%${term}%` })
+      .orderBy('p.created', 'DESC')
+      .take(limit)
+      .getMany()
+    return this.decoratePosts(rows, viewerId)
   }
 
   /** Trending clubs ranked by memberCount then keyPrice → TrendingItem[]. */
@@ -297,37 +466,37 @@ export class PostsService {
     viewerId?: string,
   ): Promise<PostDto[]> {
     const rows = await this.posts.find({
-      where: { status: PostStatus.PUBLISHED },
+      where: { status: PostStatus.PUBLISHED, parentId: IsNull() },
       order: { created: 'DESC' },
       skip,
       take,
     })
-    if (!rows.length) return []
+    return this.decoratePosts(rows, viewerId)
+  }
 
-    const postIds = rows.map((p) => p.id)
-    const authors = await this.userMap(rows.map((p) => p.authorId))
+  /** Shared authored-post list (posts/replies tabs). */
+  private async listAuthored(
+    where: Record<string, unknown>,
+    page: number,
+    limit: number,
+    viewerId?: string,
+  ): Promise<PaginatedPostsDto> {
+    const [rows, total] = await this.posts.findAndCount({
+      where,
+      order: { created: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    })
+    const items = await this.decoratePosts(rows, viewerId)
+    return { items, meta: { total, page, limit, totalPages: Math.ceil(total / limit) || 0 } }
+  }
 
-    // like counts per post
-    const likeCounts = new Map<string, number>()
-    const counts = await this.likes
-      .createQueryBuilder('l')
-      .select('l.postId', 'postId')
-      .addSelect('COUNT(*)', 'count')
-      .where('l.postId IN (:...postIds)', { postIds })
-      .groupBy('l.postId')
-      .getRawMany<{ postId: string; count: string }>()
-    counts.forEach((r) => likeCounts.set(r.postId, parseInt(r.count, 10)))
-
-    // which of these the viewer liked
-    const likedSet = new Set<string>()
-    if (viewerId) {
-      const mine = await this.likes.find({ where: { postId: In(postIds), userId: viewerId } })
-      mine.forEach((l) => likedSet.add(l.postId))
-    }
-
-    return rows.map((p) =>
-      this.toPostDto(p, likeCounts.get(p.id) ?? 0, likedSet.has(p.id), authors),
-    )
+  /** Load posts by id preserving the given id order (drops missing ids). */
+  private async postsByIdsInOrder(ids: string[]): Promise<Post[]> {
+    if (!ids.length) return []
+    const rows = await this.posts.find({ where: { id: In(ids) } })
+    const byId = new Map(rows.map((p) => [p.id, p]))
+    return ids.map((id) => byId.get(id)).filter((p): p is Post => !!p)
   }
 
   private async loadTrades(skip: number, take: number): Promise<TradeActivityDto[]> {
@@ -345,10 +514,94 @@ export class PostsService {
     }))
   }
 
+  private async decorateOne(post: Post, viewerId?: string): Promise<PostDto> {
+    const [dto] = await this.decoratePosts([post], viewerId)
+    return dto
+  }
+
+  /**
+   * Map posts → PostDto[] resolving real counts (likes/comments/reposts/
+   * bookmarks) and per-viewer flags (liked/reposted/bookmarked) with batched
+   * `In(...)` queries — no N+1.
+   */
+  private async decoratePosts(rows: Post[], viewerId?: string): Promise<PostDto[]> {
+    if (!rows.length) return []
+
+    const postIds = rows.map((p) => p.id)
+    const authors = await this.userMap(rows.map((p) => p.authorId))
+
+    const [likeCounts, commentCounts, repostCounts, bookmarkCounts] = await Promise.all([
+      this.countByPost(this.likes, postIds),
+      this.countChildren(postIds),
+      this.countByPost(this.reposts, postIds),
+      this.countByPost(this.bookmarks, postIds),
+    ])
+
+    const likedSet = new Set<string>()
+    const repostedSet = new Set<string>()
+    const bookmarkedSet = new Set<string>()
+    if (viewerId) {
+      const [ml, mr, mb] = await Promise.all([
+        this.likes.find({ where: { postId: In(postIds), userId: viewerId } }),
+        this.reposts.find({ where: { postId: In(postIds), userId: viewerId } }),
+        this.bookmarks.find({ where: { postId: In(postIds), userId: viewerId } }),
+      ])
+      ml.forEach((r) => likedSet.add(r.postId))
+      mr.forEach((r) => repostedSet.add(r.postId))
+      mb.forEach((r) => bookmarkedSet.add(r.postId))
+    }
+
+    return rows.map((p) =>
+      this.toPostDto(
+        p,
+        {
+          likes: likeCounts.get(p.id) ?? 0,
+          comments: commentCounts.get(p.id) ?? 0,
+          reposts: repostCounts.get(p.id) ?? 0,
+          bookmarks: bookmarkCounts.get(p.id) ?? 0,
+          liked: likedSet.has(p.id),
+          reposted: repostedSet.has(p.id),
+          bookmarked: bookmarkedSet.has(p.id),
+        },
+        authors,
+      ),
+    )
+  }
+
+  /** COUNT(*) grouped by `postId` over the given post ids → Map<postId, count>. */
+  private async countByPost<T extends ObjectLiteral>(
+    repo: Repository<T>,
+    postIds: string[],
+  ): Promise<Map<string, number>> {
+    const map = new Map<string, number>()
+    const rows = await repo
+      .createQueryBuilder('x')
+      .select('x.postId', 'postId')
+      .addSelect('COUNT(*)', 'count')
+      .where('x.postId IN (:...postIds)', { postIds })
+      .groupBy('x.postId')
+      .getRawMany<{ postId: string; count: string }>()
+    rows.forEach((r) => map.set(r.postId, parseInt(r.count, 10)))
+    return map
+  }
+
+  /** Comment counts: number of child posts per parent id. */
+  private async countChildren(parentIds: string[]): Promise<Map<string, number>> {
+    const map = new Map<string, number>()
+    const rows = await this.posts
+      .createQueryBuilder('p')
+      .select('p.parentId', 'parentId')
+      .addSelect('COUNT(*)', 'count')
+      .where('p.parentId IN (:...parentIds)', { parentIds })
+      .groupBy('p.parentId')
+      .getRawMany<{ parentId: string; count: string }>()
+    rows.forEach((r) => map.set(r.parentId, parseInt(r.count, 10)))
+    return map
+  }
+
   private toPostDto(
     post: Post,
-    likes: number,
-    liked: boolean,
+    stats: PostStatsView,
     authors: Map<string, FeedUserDto>,
   ): PostDto {
     return {
@@ -356,10 +609,16 @@ export class PostsService {
       author: authors.get(post.authorId) ?? this.unknownUser(post.authorId),
       body: post.body,
       createdAt: post.created.toISOString(),
-      stats: { likes, comments: 0, reposts: 0, shares: 0, bookmarks: 0 },
-      liked,
-      bookmarked: false,
-      reposted: false,
+      stats: {
+        likes: stats.likes,
+        comments: stats.comments,
+        reposts: stats.reposts,
+        shares: 0, // no share tracking yet
+        bookmarks: stats.bookmarks,
+      },
+      liked: stats.liked,
+      bookmarked: stats.bookmarked,
+      reposted: stats.reposted,
       // `club` inline price chart left undefined — posts aren't club-linked yet.
     }
   }

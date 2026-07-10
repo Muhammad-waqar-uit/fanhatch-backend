@@ -10,6 +10,8 @@ import { TaskSchedulerModule } from '@app/src/task-scheduler/task-scheduler.modu
 import { NotificationsModule } from '@app/src/notifications/notifications.module'
 import { Post } from './entities/post.entity'
 import { PostLike } from './entities/post-like.entity'
+import { PostRepost } from './entities/post-repost.entity'
+import { PostBookmark } from './entities/post-bookmark.entity'
 import { Trade } from './entities/trade.entity'
 import { PostsController } from './posts.controller'
 import { PostsService } from './posts.service'
@@ -28,7 +30,7 @@ const runWorkers = process.env.RUN_WORKERS !== 'false'
 // CronScheduler is picked up without importing ScheduleModule here.
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Post, PostLike, Trade, User, Club, Holding]),
+    TypeOrmModule.forFeature([Post, PostLike, PostRepost, PostBookmark, Trade, User, Club, Holding]),
     NotificationsModule,
     ...(redis ? [BullModule.registerQueue({ name: POST_PUBLISH_QUEUE }), TaskSchedulerModule] : []),
   ],

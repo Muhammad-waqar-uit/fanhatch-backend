@@ -20,6 +20,14 @@ export class Post extends MyEntity {
   @Column('uuid')
   authorId: string
 
+  /**
+   * Self-referential parent. `null` → top-level post; non-null → a reply to the
+   * post with this id. Arbitrary nesting is allowed. Indexed for child lookups.
+   */
+  @Index()
+  @Column({ type: 'uuid', nullable: true })
+  parentId?: string | null
+
   @Column({ type: 'text' })
   body: string
 
