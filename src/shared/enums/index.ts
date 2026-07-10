@@ -17,6 +17,13 @@ export enum UserRole {
   SUPERADMIN = 'superadmin',
 }
 
+/** Subscription tier (Premium screen). No billing yet — selection just records the tier. */
+export enum UserPlan {
+  FREE = 'free',
+  PREMIUM = 'premium',
+  PRO = 'pro',
+}
+
 /** i18n / error message keys. Extend as modules are added. */
 export enum ErrorKey {
   NOT_FOUND = 'errors.not_found',

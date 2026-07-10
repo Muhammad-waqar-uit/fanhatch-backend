@@ -21,6 +21,9 @@ import { SocialModule } from './social/social.module'
 import { WalletModule } from './wallet/wallet.module'
 import { LpModule } from './lp/lp.module'
 import { PostsModule } from './posts/posts.module'
+import { DiscoverModule } from './discover/discover.module'
+import { PremiumModule } from './premium/premium.module'
+import { ReferralsModule } from './referrals/referrals.module'
 import { NotificationsModule } from './notifications/notifications.module'
 
 @Module({
@@ -75,6 +78,9 @@ import { NotificationsModule } from './notifications/notifications.module'
     WalletModule,
     LpModule,
     PostsModule,
+    DiscoverModule,
+    PremiumModule,
+    ReferralsModule,
     NotificationsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

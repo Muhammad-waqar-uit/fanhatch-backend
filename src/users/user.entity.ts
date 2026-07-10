@@ -1,6 +1,6 @@
 import { Column, Entity, Index } from 'typeorm'
 import { MyEntity } from '@app/shared/base'
-import { Status, UserRole } from '@app/shared/enums'
+import { Status, UserPlan, UserRole } from '@app/shared/enums'
 
 @Entity('users')
 export class User extends MyEntity {
@@ -32,6 +32,24 @@ export class User extends MyEntity {
 
   @Column({ type: 'enum', enum: Status, default: Status.ACTIVE })
   status: Status
+
+  /** Subscription tier (Premium screen). No billing — selection just records it. */
+  @Column({ type: 'enum', enum: UserPlan, default: UserPlan.FREE })
+  plan: UserPlan
+
+  /** When the plan last changed. */
+  @Column({ type: 'timestamptz', nullable: true })
+  planSince?: Date
+
+  /** Unique referral code (generated lazily on first /referrals/me). */
+  @Index({ unique: true, where: '"referralCode" IS NOT NULL' })
+  @Column({ nullable: true })
+  referralCode?: string
+
+  /** The user who referred this account (one-time, set via /referrals/redeem). */
+  @Index()
+  @Column({ type: 'uuid', nullable: true })
+  referredById?: string
 
   /** Web2-simulated ETH balance (numeric → serialized as string). Backed on-chain later. */
   @Column({ type: 'numeric', precision: 30, scale: 8, default: 0 })
