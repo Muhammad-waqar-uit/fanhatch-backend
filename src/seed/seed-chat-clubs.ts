@@ -35,7 +35,7 @@ const dataSource = new DataSource({
   port: parseInt(process.env.TYPEORM_PORT || '5432', 10),
   username: process.env.TYPEORM_USERNAME || 'postgres',
   password: process.env.TYPEORM_PASSWORD || 'postgres',
-  database: process.env.TYPEORM_DATABASE || 'fanstech',
+  database: process.env.TYPEORM_DATABASE || 'fanhatch',
   entities: [User, Club, Holding, Follow, ChatRoom, RoomMember, ChatMessage, LpPool, Post, Trade],
   synchronize: false,
   logging: false,
@@ -55,7 +55,7 @@ async function main(): Promise<void> {
   const members = dataSource.getRepository(RoomMember)
   const messages = dataSource.getRepository(ChatMessage)
 
-  if (await users.findOne({ where: { email: 'alice@fans.tech' } })) {
+  if (await users.findOne({ where: { email: 'alice@fanhatch.tech' } })) {
     console.log('[seed] demo users already exist — nothing to do')
     await dataSource.destroy()
     return
@@ -65,14 +65,14 @@ async function main(): Promise<void> {
   // Web2-simulated balances so Wallet/LP have something to trade.
   const alice = await users.save(
     users.create({
-      email: 'alice@fans.tech', username: 'alice', passwordHash, bio: 'Founder #1',
+      email: 'alice@fanhatch.tech', username: 'alice', passwordHash, bio: 'Founder #1',
       avatarUrl: 'https://i.pravatar.cc/150?u=alice',
       ethBalance: money(2), fansBalance: money(5000),
     }),
   )
   const bob = await users.save(
     users.create({
-      email: 'bob@fans.tech', username: 'bob', passwordHash, bio: 'Founder #2',
+      email: 'bob@fanhatch.tech', username: 'bob', passwordHash, bio: 'Founder #2',
       avatarUrl: 'https://i.pravatar.cc/150?u=bob',
       ethBalance: money(1.5), fansBalance: money(3000),
     }),

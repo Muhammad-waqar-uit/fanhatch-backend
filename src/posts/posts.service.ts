@@ -13,6 +13,7 @@ import { Club } from '@app/src/clubs/entities/club.entity'
 import { Holding } from '@app/src/clubs/entities/holding.entity'
 import { NotificationsService } from '@app/src/notifications/notifications.service'
 import { NotificationRelatedTo, NotificationType } from '@app/src/notifications/enums'
+import { CrossPostService } from '@app/src/crosspost/crosspost.service'
 import { Post, PostStatus } from './entities/post.entity'
 import { PostLike } from './entities/post-like.entity'
 import { PostRepost } from './entities/post-repost.entity'
@@ -60,6 +61,7 @@ export class PostsService {
     @InjectRepository(Holding) private readonly holdings: Repository<Holding>,
     @Inject(POST_SCHEDULER) private readonly scheduler: PostScheduler,
     private readonly notifications: NotificationsService,
+    private readonly crossPost: CrossPostService,
   ) {}
 
   /** Create a post authored by the JWT user. A `parentId` makes it a reply. */
@@ -91,9 +93,18 @@ export class PostsService {
 
     if (post.status === PostStatus.PUBLISHED) {
       await this.notifyPostPublished(post)
+      this.mirrorCrossPost(post)
     }
 
     return this.decorateOne(post, authorId)
+  }
+
+  /** Fire-and-forget mirror to the selected external platforms (env-gated; no-op until keys land). */
+  private mirrorCrossPost(post: Post): void {
+    if (!post.crossPostTargets?.length) return
+    void this.crossPost
+      .dispatch({ id: post.id, body: post.body, authorId: post.authorId }, post.crossPostTargets)
+      .catch((e) => this.logger.warn(`cross-post ${post.id} failed: ${(e as Error).message}`))
   }
 
   /** The caller's posts, optionally filtered by status, newest first. */
@@ -142,7 +153,10 @@ export class PostsService {
       post.status = PostStatus.PUBLISHED
       post.publishedAt = post.publishedAt ?? new Date()
       if (prevStatus === PostStatus.SCHEDULED) this.scheduler.onCancelled(post.id)
-      if (prevStatus !== PostStatus.PUBLISHED) await this.notifyPostPublished(post)
+      if (prevStatus !== PostStatus.PUBLISHED) {
+        await this.notifyPostPublished(post)
+        this.mirrorCrossPost(post)
+      }
     } else {
       // → draft (cancel a schedule) or a plain body edit on a draft.
       if (dto.scheduledAt !== undefined) post.scheduledAt = nextScheduledAt
@@ -171,7 +185,10 @@ export class PostsService {
     post.publishedAt = new Date()
     const saved = await this.posts.save(post)
     if (wasScheduled) this.scheduler.onCancelled(post.id)
-    if (!wasPublished) await this.notifyPostPublished(saved)
+    if (!wasPublished) {
+      await this.notifyPostPublished(saved)
+      this.mirrorCrossPost(saved)
+    }
     return this.decorateOne(saved, userId)
   }
 

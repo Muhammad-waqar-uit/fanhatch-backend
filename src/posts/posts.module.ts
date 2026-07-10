@@ -8,6 +8,7 @@ import { isRedisConfigured } from '@app/shared/redis/redis.util'
 import { POST_PUBLISH_QUEUE } from '@app/shared/constant/queues'
 import { TaskSchedulerModule } from '@app/src/task-scheduler/task-scheduler.module'
 import { NotificationsModule } from '@app/src/notifications/notifications.module'
+import { CrossPostModule } from '@app/src/crosspost/crosspost.module'
 import { Post } from './entities/post.entity'
 import { PostLike } from './entities/post-like.entity'
 import { PostRepost } from './entities/post-repost.entity'
@@ -32,6 +33,7 @@ const runWorkers = process.env.RUN_WORKERS !== 'false'
   imports: [
     TypeOrmModule.forFeature([Post, PostLike, PostRepost, PostBookmark, Trade, User, Club, Holding]),
     NotificationsModule,
+    CrossPostModule,
     ...(redis ? [BullModule.registerQueue({ name: POST_PUBLISH_QUEUE }), TaskSchedulerModule] : []),
   ],
   controllers: [PostsController],

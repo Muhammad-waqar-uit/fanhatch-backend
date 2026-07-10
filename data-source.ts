@@ -15,7 +15,7 @@ export default new DataSource({
   port: parseInt(process.env.TYPEORM_PORT || '5432', 10),
   username: process.env.TYPEORM_USERNAME || 'postgres',
   password: process.env.TYPEORM_PASSWORD || 'postgres',
-  database: process.env.TYPEORM_DATABASE || 'fanstech',
+  database: process.env.TYPEORM_DATABASE || 'fanhatch',
   entities: ['dist/src/**/*.entity.js'],
   migrations: ['dist/src/migrations/*.js'],
   migrationsTableName: process.env.TYPEORM_MIGRATIONS_TABLE_NAME || 'migrations',

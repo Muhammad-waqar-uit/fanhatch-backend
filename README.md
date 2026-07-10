@@ -1,4 +1,4 @@
-# Fans.tech Backend
+# Fanhatch Backend
 
 Web2 base structure (NestJS 11 + TypeORM + Postgres), mirroring the `mvmnt-backend`
 conventions. This is the **foundation only** — auth, users, health, and the shared

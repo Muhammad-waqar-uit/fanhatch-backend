@@ -13,7 +13,7 @@ const REWARDS: ReferralRewardDto[] = [
 ]
 
 /** Base for the shareable referral link (cosmetic). */
-const LINK_BASE = process.env.REFERRAL_LINK_BASE ?? 'https://fans.tech'
+const LINK_BASE = process.env.REFERRAL_LINK_BASE ?? 'https://fanhatch.tech'
 
 @Injectable()
 export class ReferralsService {

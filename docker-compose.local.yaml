@@ -5,11 +5,11 @@ services:
     environment:
       POSTGRES_USER: ${TYPEORM_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${TYPEORM_PASSWORD:-postgres}
-      POSTGRES_DB: ${TYPEORM_DATABASE:-fanstech}
+      POSTGRES_DB: ${TYPEORM_DATABASE:-fanhatch}
     ports:
       - '5432:5432'
     volumes:
-      - fanstech_pg:/var/lib/postgresql/data
+      - fanhatch_pg:/var/lib/postgresql/data
 
 volumes:
-  fanstech_pg:
+  fanhatch_pg:

@@ -5,7 +5,7 @@ export default () => ({
     port: parseInt(process.env.TYPEORM_PORT || '5432', 10),
     username: process.env.TYPEORM_USERNAME || 'postgres',
     password: process.env.TYPEORM_PASSWORD || 'postgres',
-    database: process.env.TYPEORM_DATABASE || 'fanstech',
+    database: process.env.TYPEORM_DATABASE || 'fanhatch',
     // Entities are auto-loaded by @nestjs/typeorm (autoLoadEntities); migrations run via the CLI.
     // DEV ONLY: set TYPEORM_SYNC=true to auto-create the schema from entities (no migrations needed
     // for a quick local test). Keep false in prod and use migrations. ponytail: a proper `users`

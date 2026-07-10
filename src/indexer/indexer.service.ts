@@ -25,7 +25,7 @@ const CHUNK = 10n
 const POLL_MS = 15_000
 
 /**
- * Minimal poll-based chain indexer for Fans.tech on Sepolia.
+ * Minimal poll-based chain indexer for Fanhatch on Sepolia.
  *
  * Backfills ClubFactory.ClubCreated + per-ClubKey KeyBought/KeySold/Gift from the
  * deploy block, then polls every ~15s. Holder counts are recomputed authoritatively

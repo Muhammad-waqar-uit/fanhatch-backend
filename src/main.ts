@@ -78,7 +78,7 @@ async function bootstrap() {
 
   const port = config.get<number>('app.port')
   await app.listen(port)
-  logger.log(`Fans.tech API listening on http://localhost:${port}/${config.get('app.prefix')}`)
+  logger.log(`Fanhatch API listening on http://localhost:${port}/${config.get('app.prefix')}`)
 }
 
 bootstrap()

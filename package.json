@@ -1,7 +1,7 @@
 {
-  "name": "fans-tech-backend",
+  "name": "fanhatch-backend",
   "version": "0.0.1",
-  "description": "Fans.tech backend — web2 base (NestJS + TypeORM)",
+  "description": "Fanhatch backend — web2 base (NestJS + TypeORM)",
   "private": true,
   "license": "UNLICENSED",
   "scripts": {

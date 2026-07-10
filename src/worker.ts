@@ -31,7 +31,7 @@ async function bootstrap() {
   process.on('SIGTERM', () => void shutdown('SIGTERM'))
   process.on('SIGINT', () => void shutdown('SIGINT'))
 
-  logger.log('Fans.tech worker started — processing BullMQ jobs + reconciler cron')
+  logger.log('Fanhatch worker started — processing BullMQ jobs + reconciler cron')
 }
 
 bootstrap().catch((err) => {

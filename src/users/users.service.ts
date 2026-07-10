@@ -67,7 +67,7 @@ export class UsersService extends MyService<User> {
     const short = walletAddress.slice(2, 14)
     const passwordHash = await bcrypt.hash(`siwe:${walletAddress}:${Date.now()}`, 10)
     const user = this.users.create({
-      email: `${walletAddress}@wallet.fans.tech`,
+      email: `${walletAddress}@wallet.fanhatch.tech`,
       username: `wallet_${short}`,
       passwordHash,
       walletAddress,

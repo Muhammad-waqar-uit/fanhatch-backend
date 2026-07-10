@@ -1,5 +1,5 @@
 /**
- * On-chain config — Fans.tech contracts on Ethereum Sepolia (Phase 2 / web3).
+ * On-chain config — Fanhatch contracts on Ethereum Sepolia (Phase 2 / web3).
  * Enabled only when CHAIN_RPC_URL is set; otherwise the app stays fully web2.
  */
 export default () => ({

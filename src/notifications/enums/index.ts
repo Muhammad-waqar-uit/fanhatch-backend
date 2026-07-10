@@ -1,5 +1,5 @@
 /**
- * Notification domain enums (Fans.tech).
+ * Notification domain enums (Fanhatch).
  *
  * These are the single source of truth for notification typing across the
  * entity, service, gateway and DTOs. `NotificationRelatedTo` also drives the

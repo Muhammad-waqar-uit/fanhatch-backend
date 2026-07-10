@@ -11,7 +11,7 @@ type ChainConfig = {
 }
 
 /**
- * Thin viem provider over the deployed Fans.tech contracts. Exposes the public
+ * Thin viem provider over the deployed Fanhatch contracts. Exposes the public
  * client + checksummed addresses for the indexer, plus a couple of read helpers
  * the on-chain gating swap will use. Read-only — signing lives on the frontend.
  */

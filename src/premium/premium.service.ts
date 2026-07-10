@@ -43,7 +43,7 @@ const PLANS: PlanDto[] = [
     price: 873,
     period: 'Per year',
     features: [
-      'Fans.tech Studio',
+      'Fanhatch Studio',
       'Long-form publishing & tipping',
       'Cross-platform Ads Suite',
       'Create & manage paid campaigns',
